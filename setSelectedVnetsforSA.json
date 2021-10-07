@@ -1,0 +1,114 @@
+{
+	"properties": {
+		"displayName": "Modify - set selected network for storage account",
+		"policyType": "Custom",
+		"mode": "Indexed",
+		"description": "set selected network for storage account",
+		"metadata": {
+			"category": "Storage Account",
+			"version": "1.0.0"
+		},
+		"parameters": {
+			"effect": {
+				"type": "String",
+				"metadata": {
+					"displayName": "Effect",
+					"description": "Enable or disable the execution of the policy"
+				},
+				"allowedValues": [
+					"Modify",
+					"Disabled",
+					"Audit"
+				],
+				"defaultValue": "Audit"
+			},
+			"allowedNetworks": {
+				"type": "array",
+				"metadata": {
+					"description": "The list of allowed virtual networks",
+					"displayName": "Allowed Networks"
+				},
+				"defaultValue": [
+					{
+						"id": "/subscriptions/xxx/resourceGroups/rogertest3/providers/Microsoft.Network/virtualNetworks/rogertest3-vnet/subnets/default",
+						"action": "Allow",
+						"state": "Succeeded"
+					},
+					{
+						"id": "/subscriptions/xxx/resourceGroups/rogertest3/providers/Microsoft.Network/virtualNetworks/rogertest3-vnet/subnets/AzureBastionSubnet",
+						"action": "Allow",
+						"state": "Succeeded"
+					}
+				]
+			}
+		},
+		"policyRule": {
+			"if": {
+				"allOf": [
+					{
+						"field": "type",
+						"equals": "Microsoft.Storage/storageAccounts"
+					},
+					{
+						"anyOf": [
+							{
+								"field": "Microsoft.Storage/storageAccounts/networkAcls.defaultAction",
+								"notEquals": "Deny"
+							},
+							{
+								"count": {
+									"value": "[parameters('allowednetworks')]",
+									"name": "allowedNetworks",
+									"where": {
+										"count": {
+											"field": "Microsoft.Storage/storageAccounts/networkAcls.virtualNetworkRules[*]",
+											"where": {
+												"allOf": [
+													{
+														"field": "Microsoft.Storage/storageAccounts/networkAcls.virtualNetworkRules[*].id",
+														"equals": "[current('allowedNetworks').id]"
+													},
+													{
+														"field": "Microsoft.Storage/storageAccounts/networkAcls.virtualNetworkRules[*].action",
+														"equals": "[current('allowedNetworks').action]"
+													},
+													{
+														"field": "Microsoft.Storage/storageAccounts/networkAcls.virtualNetworkRules[*].state",
+														"equals": "[current('allowedNetworks').state]"
+													}
+												]
+											}
+										},
+										"equals": 1
+									}
+								},
+								"notEquals": "[length(parameters('allowednetworks'))]"
+							}
+						]
+					}
+				]
+			},
+			"then": {
+				"effect": "[parameters('effect')]",
+				"details": {
+					"roleDefinitionIds": [
+						"/providers/microsoft.authorization/roleDefinitions/17d1049b-9a84-46fb-8f53-869881c3d3ab"
+					],
+					"conflictEffect": "audit",
+					"operations": [
+						{
+							"operation": "addOrReplace",
+							"field": "Microsoft.Storage/storageAccounts/networkAcls.virtualNetworkRules",
+							"value": "[parameters('allowednetworks')]"
+						},
+						{
+							"operation": "addOrReplace",
+							"field": "Microsoft.Storage/storageAccounts/networkAcls.defaultAction",
+							"value": "Deny"
+						}
+					]
+				}
+			}
+		}
+	}
+}
